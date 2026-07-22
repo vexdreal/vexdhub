@@ -13,27 +13,56 @@ const items = [
   { id: "settings", icon: "⚙", label: "Appearance" },
 ];
 
-export default function Sidebar({ activeSection, onSelect, onLogout }: Props) {
+export default function Sidebar({
+  activeSection,
+  onSelect,
+  onLogout,
+}: Props) {
   return (
     <aside className="app-sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-mark">V</div>
-        <div>
-          <strong>VexdHub</strong>
-          <span>License Cloud</span>
-        </div>
-      </div>
+      <button
+        type="button"
+        className="sidebar-brand"
+        onClick={() => onSelect("overview")}
+        aria-label="Buka overview"
+      >
+        <img
+          src="/branding/logo.png"
+          alt="Logo VexdHub"
+          className="sidebar-brand-logo"
+        />
 
-      <nav className="sidebar-nav" aria-label="Admin navigation">
+        <div className="sidebar-brand-copy">
+          <strong>
+            <span>VEXD</span>
+            <span>HUB</span>
+          </strong>
+
+          <small>Smart License System</small>
+        </div>
+      </button>
+
+      <nav
+        className="sidebar-nav"
+        aria-label="Admin navigation"
+      >
         <p className="sidebar-label">Workspace</p>
+
         {items.map((item) => (
           <button
             type="button"
             key={item.id}
-            className={`sidebar-link ${activeSection === item.id ? "is-active" : ""}`}
+            className={`sidebar-link ${
+              activeSection === item.id
+                ? "is-active"
+                : ""
+            }`}
             onClick={() => onSelect(item.id)}
           >
-            <span className="sidebar-icon">{item.icon}</span>
+            <span className="sidebar-icon">
+              {item.icon}
+            </span>
+
             <span>{item.label}</span>
           </button>
         ))}
@@ -42,12 +71,18 @@ export default function Sidebar({ activeSection, onSelect, onLogout }: Props) {
       <div className="sidebar-footer">
         <div className="server-pill">
           <span className="status-dot" />
+
           <div>
             <strong>System Online</strong>
             <span>Neon PostgreSQL</span>
           </div>
         </div>
-        <button type="button" className="sidebar-logout" onClick={onLogout}>
+
+        <button
+          type="button"
+          className="sidebar-logout"
+          onClick={onLogout}
+        >
           <span>↪</span>
           Logout
         </button>

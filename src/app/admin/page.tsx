@@ -113,7 +113,7 @@ export default function Admin() {
 
     const timeout = window.setTimeout(() => {
       controller.abort();
-    }, 15000);
+    }, 30000);
 
     try {
       setLoadingKeys(true);
@@ -147,7 +147,9 @@ export default function Admin() {
         error instanceof DOMException &&
         error.name === "AbortError"
       ) {
-        console.warn("Auto refresh timeout");
+        notify(
+          "Database terlalu lama merespons. Tekan Refresh Data."
+        );
 
         return;
       }
@@ -195,19 +197,6 @@ export default function Admin() {
     void checkSession();
   }, [checkSession]);
   
-  useEffect(() => {
-  if (!loggedIn) {
-    return;
-  }
-
-  const interval = window.setInterval(() => {
-    void loadKeys();
-  }, 15000);
-
-  return () => {
-    window.clearInterval(interval);
-  };
-}, [loggedIn, loadKeys]);
 
   async function login() {
     try {
@@ -733,11 +722,27 @@ export default function Admin() {
           className="dashboard-section"
         >
           <DashboardStats
-            total={keys.length}
-            active={activeCount}
-            expired={expiredCount}
-            devices={deviceCount}
-          />
+  total={keys.length}
+  active={activeCount}
+  expired={expiredCount}
+  devices={deviceCount}
+  today={
+    keys.filter((item) => {
+      const created = new Date(item.createdAt);
+      const today = new Date();
+
+      return (
+        created.getDate() === today.getDate() &&
+        created.getMonth() === today.getMonth() &&
+        created.getFullYear() === today.getFullYear()
+      );
+    }).length
+  }
+  activation={keys.reduce(
+    (total, item) => total + item.useCount,
+    0
+  )}
+/>
 
           <div className="dashboard-grid">
             <GenerateCard

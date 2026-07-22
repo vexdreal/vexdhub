@@ -1043,3 +1043,85 @@ body > main:not(.app-shell):not(.auth-screen):not(.center-screen) {
   .status-badge { width: max-content; }
   .toast-message { left: 12px; right: 12px; top: 12px; }
 }
+
+.sidebar-brand {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-brand:hover {
+  background: rgba(255, 30, 30, 0.08);
+  box-shadow: 0 0 24px rgba(255, 30, 30, 0.12);
+  transform: none;
+}
+
+.sidebar-brand-logo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 7px rgba(255, 30, 30, 0.8))
+    drop-shadow(0 0 15px rgba(179, 0, 0, 0.35));
+  transition:
+    transform 0.25s ease,
+    filter 0.25s ease;
+}
+
+.sidebar-brand:hover .sidebar-brand-logo {
+  transform: scale(1.06) rotate(-2deg);
+  filter:
+    drop-shadow(0 0 10px rgba(255, 30, 30, 0.95))
+    drop-shadow(0 0 22px rgba(179, 0, 0, 0.5));
+}
+
+.sidebar-brand-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-brand-copy strong {
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  line-height: 1;
+}
+
+.sidebar-brand-copy strong span:first-child {
+  color: #ff1e1e;
+}
+
+.sidebar-brand-copy strong span:last-child {
+  color: #f5f5f5;
+}
+
+.sidebar-brand-copy small {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .sidebar-brand-copy {
+    display: none;
+  }
+
+  .sidebar-brand {
+    justify-content: center;
+  }
+}
