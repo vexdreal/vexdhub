@@ -1,65 +1,55 @@
 "use client";
 
-import ThemeSwitcher from "@/components/ThemeSwitcher";
-
 type Props = {
   activeSection: string;
-  onSectionChange: (section: string) => void;
+  onSelect: (section: string) => void;
   onLogout: () => void;
 };
 
 const items = [
-  { id: "overview", label: "Overview", icon: "◈" },
-  { id: "licenses", label: "Licenses", icon: "⌁" },
-  { id: "generate", label: "Generate", icon: "+" },
-  { id: "settings", label: "Appearance", icon: "✦" },
+  { id: "overview", icon: "▦", label: "Overview" },
+  { id: "licenses", icon: "◇", label: "Licenses" },
+  { id: "activity", icon: "↻", label: "Activity" },
+  { id: "settings", icon: "⚙", label: "Appearance" },
 ];
 
-export default function Sidebar({
-  activeSection,
-  onSectionChange,
-  onLogout,
-}: Props) {
+export default function Sidebar({ activeSection, onSelect, onLogout }: Props) {
   return (
-    <aside className="sidebar">
-      <div className="brand-block">
+    <aside className="app-sidebar">
+      <div className="sidebar-brand">
         <div className="brand-mark">V</div>
         <div>
           <strong>VexdHub</strong>
-          <span>License Console</span>
+          <span>License Cloud</span>
         </div>
       </div>
 
       <nav className="sidebar-nav" aria-label="Admin navigation">
+        <p className="sidebar-label">Workspace</p>
         {items.map((item) => (
           <button
-            key={item.id}
             type="button"
+            key={item.id}
             className={`sidebar-link ${activeSection === item.id ? "is-active" : ""}`}
-            onClick={() => onSectionChange(item.id)}
+            onClick={() => onSelect(item.id)}
           >
             <span className="sidebar-icon">{item.icon}</span>
-            {item.label}
+            <span>{item.label}</span>
           </button>
         ))}
       </nav>
 
-      <div className="sidebar-bottom">
-        <div className="sidebar-theme">
-          <span className="eyebrow">Theme</span>
-          <ThemeSwitcher compact />
-        </div>
-
-        <div className="admin-chip">
-          <div className="admin-avatar">VR</div>
+      <div className="sidebar-footer">
+        <div className="server-pill">
+          <span className="status-dot" />
           <div>
-            <strong>vexdreal</strong>
-            <span>Owner</span>
+            <strong>System Online</strong>
+            <span>Neon PostgreSQL</span>
           </div>
         </div>
-
         <button type="button" className="sidebar-logout" onClick={onLogout}>
-          Sign out
+          <span>↪</span>
+          Logout
         </button>
       </div>
     </aside>

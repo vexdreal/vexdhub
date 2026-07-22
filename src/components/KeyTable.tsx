@@ -16,130 +16,99 @@ type Props = {
   onDelete: (id: number) => void;
   onToggle: (id: number) => void;
   onReset: (id: number) => void;
-  onMessage?: (message: string) => void;
+  onNotify?: (message: string) => void;
 };
 
-export default function KeyTable({
-  keys,
-  onDelete,
-  onToggle,
-  onReset,
-  onMessage,
-}: Props) {
+function formatDate(value: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default function KeyTable({ keys, onDelete, onToggle, onReset, onNotify }: Props) {
   async function copyText(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
-      onMessage?.(`${label} copied to clipboard`);
+      onNotify?.(`${label} berhasil disalin`);
     } catch {
-      onMessage?.(`Failed to copy ${label.toLowerCase()}`);
+      onNotify?.(`Gagal menyalin ${label}`);
     }
   }
 
   function confirmDelete(id: number, key: string) {
-    if (window.confirm(`Delete ${key} permanently? This action cannot be undone.`)) {
-      onDelete(id);
-    }
+    if (window.confirm(`Hapus license ${key} secara permanen?`)) onDelete(id);
   }
 
   function confirmReset(id: number, key: string) {
-    if (window.confirm(`Reset the bound device for ${key}?`)) {
-      onReset(id);
-    }
-  }
-
-  function formatDate(value: string | null, empty: string) {
-    if (!value) return empty;
-    return new Intl.DateTimeFormat("id-ID", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(value));
+    if (window.confirm(`Reset device untuk ${key}?`)) onReset(id);
   }
 
   if (keys.length === 0) {
     return (
-      <div className="empty-state">
-        <div className="empty-icon">⌁</div>
-        <h3>No licenses found</h3>
-        <p>Try another filter or generate a new license.</p>
-      </div>
+      <section className="panel license-panel">
+        <div className="empty-state">
+          <span>◇</span>
+          <h3>Tidak ada license</h3>
+          <p>Ubah filter atau generate license baru.</p>
+        </div>
+      </section>
     );
   }
 
   return (
-    <div className="license-grid">
+    <section className="license-grid">
       {keys.map((item) => {
-        const expired = Boolean(
-          item.expiresAt && new Date(item.expiresAt).getTime() < Date.now()
-        );
-        const status = !item.active ? "Disabled" : expired ? "Expired" : "Active";
-        const statusClass = !item.active ? "disabled" : expired ? "expired" : "active";
+        const expired = Boolean(item.expiresAt && new Date(item.expiresAt).getTime() < Date.now());
+        const status = !item.active ? "Nonaktif" : expired ? "Expired" : "Active";
+        const statusClass = !item.active ? "inactive" : expired ? "expired" : "active";
 
         return (
           <article className="license-card" key={item.id}>
-            <div className="license-card-head">
+            <div className="license-card-header">
               <div>
-                <span className="eyebrow">License key</span>
-                <button
-                  type="button"
-                  className="license-key"
-                  title="Copy license key"
-                  onClick={() => void copyText(item.key, "License key")}
-                >
-                  {item.key}
-                </button>
+                <p className="eyebrow">LICENSE KEY</p>
+                <h3>{item.key}</h3>
               </div>
               <span className={`status-badge ${statusClass}`}>
-                <span /> {status}
+                <span className="status-dot" />
+                {status}
               </span>
             </div>
 
             <div className="license-meta-grid">
               <div className="meta-box wide">
-                <span>Device binding</span>
-                <strong title={item.deviceId ?? "Not bound"}>
-                  {item.deviceId ? `${item.deviceId.slice(0, 24)}…` : "Not bound yet"}
-                </strong>
+                <span>Device</span>
+                <strong title={item.deviceId ?? ""}>{item.deviceId ?? "Belum digunakan"}</strong>
               </div>
               <div className="meta-box">
-                <span>Usage</span>
-                <strong>{item.useCount ?? 0} times</strong>
+                <span>Dipakai</span>
+                <strong>{item.useCount ?? 0} kali</strong>
               </div>
               <div className="meta-box">
-                <span>Last used</span>
-                <strong>{formatDate(item.lastUsed, "Never")}</strong>
+                <span>Terakhir digunakan</span>
+                <strong>{item.lastUsed ? formatDate(item.lastUsed) : "Belum pernah"}</strong>
               </div>
-              <div className="meta-box wide">
-                <span>Expires</span>
-                <strong>{formatDate(item.expiresAt, "Permanent")}</strong>
+              <div className="meta-box">
+                <span>Expired</span>
+                <strong>{item.expiresAt ? formatDate(item.expiresAt) : "Permanen"}</strong>
               </div>
             </div>
 
             <div className="license-actions">
-              <button type="button" className="button-secondary" onClick={() => void copyText(item.key, "License key")}>Copy key</button>
-              <button
-                type="button"
-                className="button-secondary"
-                disabled={!item.deviceId}
-                onClick={() => item.deviceId && void copyText(item.deviceId, "Device ID")}
-              >
-                Copy device
-              </button>
-              <button type="button" className="button-secondary" onClick={() => onToggle(item.id)}>
-                {item.active ? "Disable" : "Enable"}
-              </button>
-              <button type="button" className="button-secondary" disabled={!item.deviceId} onClick={() => confirmReset(item.id, item.key)}>
-                Reset device
-              </button>
-              <button type="button" className="button-danger" onClick={() => confirmDelete(item.id, item.key)}>
-                Delete license
-              </button>
+              <button type="button" className="button-secondary" onClick={() => void copyText(item.key, "License key")}>Copy Key</button>
+              <button type="button" className="button-secondary" disabled={!item.deviceId} onClick={() => item.deviceId && void copyText(item.deviceId, "Device ID")}>Copy Device</button>
+              <button type="button" className="button-ghost" onClick={() => onToggle(item.id)}>{item.active ? "Nonaktifkan" : "Aktifkan"}</button>
+              <button type="button" className="button-ghost" onClick={() => confirmReset(item.id, item.key)}>Reset Device</button>
+              <button type="button" className="button-danger" onClick={() => confirmDelete(item.id, item.key)}>Hapus License</button>
             </div>
           </article>
         );
       })}
-    </div>
+    </section>
   );
 }

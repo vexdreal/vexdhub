@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+import ActivityPanel from "@/components/ActivityPanel";
 import BatchGenerateCard from "@/components/BatchGenerateCard";
+import DashboardStats from "@/components/DashboardStats";
 import GenerateCard from "@/components/GenerateCard";
-import Header from "@/components/Header";
 import KeyTable from "@/components/KeyTable";
 import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
 import Sidebar from "@/components/Sidebar";
-import StatsCard from "@/components/StatsCard";
+import Topbar from "@/components/Topbar";
 
 type KeyType = {
   id: number;
@@ -21,13 +23,14 @@ type KeyType = {
   createdAt: string;
 };
 
-type StatusFilter =
-  | "all"
-  | "active"
-  | "inactive"
-  | "expired"
-  | "bound"
-  | "unbound";
+type StatusFilter = "all" | "active" | "inactive" | "expired" | "bound" | "unbound";
+
+type ActivityItem = {
+  title: string;
+  detail: string;
+  time: string;
+  tone: "success" | "info" | "warning";
+};
 
 const ITEMS_PER_PAGE = 10;
 
@@ -36,59 +39,54 @@ export default function Admin() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [checking, setChecking] = useState(true);
   const [loadingKeys, setLoadingKeys] = useState(false);
-
+  const [generating, setGenerating] = useState(false);
   const [keys, setKeys] = useState<KeyType[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState<StatusFilter>("all");
-
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [duration, setDuration] = useState("30");
   const [message, setMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeSection, setActiveSection] = useState("overview");
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+
+  const addActivity = useCallback((title: string, detail: string, tone: ActivityItem["tone"] = "info") => {
+    const time = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    setActivities((current) => [{ title, detail, time, tone }, ...current].slice(0, 8));
+  }, []);
+
+  const notify = useCallback((text: string) => {
+    setMessage(text);
+    window.setTimeout(() => setMessage((current) => (current === text ? "" : current)), 3500);
+  }, []);
 
   const loadKeys = useCallback(async () => {
     try {
       setLoadingKeys(true);
-
-      const response = await fetch("/api/keys", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error("Gagal mengambil daftar key");
-      }
-
+      const response = await fetch("/api/keys", { cache: "no-store" });
+      if (!response.ok) throw new Error("Gagal mengambil daftar license");
       const data: KeyType[] = await response.json();
       setKeys(data);
     } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal memuat key"
-      );
+      notify(error instanceof Error ? error.message : "Gagal memuat license");
     } finally {
       setLoadingKeys(false);
     }
-  }, []);
+  }, [notify]);
 
   const checkSession = useCallback(async () => {
     try {
-      const response = await fetch("/api/admin-check", {
-        cache: "no-store",
-      });
-
+      const response = await fetch("/api/admin-check", { cache: "no-store" });
       const data = await response.json();
-
       if (data.success) {
         setLoggedIn(true);
         await loadKeys();
       }
     } catch {
-      setMessage("Gagal memeriksa sesi admin");
+      notify("Gagal memeriksa sesi admin");
     } finally {
       setChecking(false);
     }
-  }, [loadKeys]);
+  }, [loadKeys, notify]);
 
   useEffect(() => {
     void checkSession();
@@ -96,152 +94,121 @@ export default function Admin() {
 
   async function login() {
     try {
-      setMessage("Memeriksa password...");
-
+      notify("Memeriksa password...");
       const response = await fetch("/api/admin-login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
-
       const data = await response.json();
-
       if (!data.success) {
-        setMessage("Password salah");
+        notify(data.message ?? "Password salah");
         return;
       }
-
       setLoggedIn(true);
-      setMessage("Login berhasil");
+      notify("Login berhasil");
+      addActivity("Admin login", "Sesi owner berhasil dibuka", "success");
       await loadKeys();
     } catch {
-      setMessage("Login gagal");
+      notify("Login gagal. Coba lagi.");
     }
   }
 
   async function logout() {
-    await fetch("/api/admin-logout", {
-      method: "POST",
-    });
-
+    await fetch("/api/admin-logout", { method: "POST" });
     setLoggedIn(false);
     setPassword("");
     setKeys([]);
+    setActivities([]);
     setMessage("");
   }
 
   async function generateKey() {
     try {
-      const random = crypto
-        .randomUUID()
-        .replaceAll("-", "")
-        .slice(0, 10)
-        .toUpperCase();
-
+      setGenerating(true);
+      const random = crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase();
       const key = `VEXD-${random}`;
-
       const response = await fetch("/api/keys", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          key,
-          duration,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, duration }),
       });
-
       const data = await response.json();
-
-      if (!data.success) {
-        setMessage(data.message ?? "Gagal membuat key");
+      if (!response.ok || !data.success) {
+        notify(data.message ?? "Gagal membuat license");
         return;
       }
-
-      setMessage(`Key berhasil dibuat: ${key}`);
+      notify(`License berhasil dibuat: ${key}`);
+      addActivity("License generated", key, "success");
       setCurrentPage(1);
       await loadKeys();
     } catch {
-      setMessage("Terjadi kesalahan saat membuat key");
+      notify("Terjadi kesalahan saat membuat license");
+    } finally {
+      setGenerating(false);
     }
   }
 
   async function deleteKey(id: number) {
     try {
+      const target = keys.find((item) => item.id === id);
       const response = await fetch("/api/keys", {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-
       const data = await response.json();
-
-      if (!data.success) {
-        setMessage(data.message ?? "Gagal menghapus key");
+      if (!response.ok || !data.success) {
+        notify(data.message ?? "Gagal menghapus license");
         return;
       }
-
-      setMessage("Key berhasil dihapus");
+      notify("License berhasil dihapus");
+      addActivity("License deleted", target?.key ?? `ID ${id}`, "warning");
       await loadKeys();
     } catch {
-      setMessage("Gagal menghapus key");
+      notify("Gagal menghapus license");
     }
   }
 
   async function resetDevice(id: number) {
     try {
+      const target = keys.find((item) => item.id === id);
       const response = await fetch("/api/keys", {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id,
-          resetDevice: true,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, resetDevice: true }),
       });
-
       const data = await response.json();
-
-      if (!data.success) {
-        setMessage(data.message ?? "Gagal mereset device");
+      if (!response.ok || !data.success) {
+        notify(data.message ?? "Gagal mereset device");
         return;
       }
-
-      setMessage("Device berhasil direset");
+      notify("Device berhasil direset");
+      addActivity("Device reset", target?.key ?? `ID ${id}`, "info");
       await loadKeys();
     } catch {
-      setMessage("Gagal mereset device");
+      notify("Gagal mereset device");
     }
   }
 
   async function toggleKey(id: number) {
     try {
+      const target = keys.find((item) => item.id === id);
       const response = await fetch("/api/toggle-key", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-
       const data = await response.json();
-
-      if (!data.success) {
-        setMessage(
-          data.message ?? "Gagal mengubah status key"
-        );
+      if (!response.ok || !data.success) {
+        notify(data.message ?? "Gagal mengubah status license");
         return;
       }
-
-      setMessage("Status key berhasil diubah");
+      notify("Status license berhasil diubah");
+      addActivity("Status changed", target?.key ?? `ID ${id}`, "info");
       await loadKeys();
     } catch {
-      setMessage("Gagal mengubah status key");
+      notify("Gagal mengubah status license");
     }
   }
 
@@ -250,145 +217,187 @@ export default function Admin() {
     const keyword = search.trim().toLowerCase();
 
     return keys.filter((item) => {
-      const expired =
-        item.expiresAt !== null &&
-        new Date(item.expiresAt).getTime() < now;
-
-      const matchesSearch =
-        item.key.toLowerCase().includes(keyword) ||
-        (item.deviceId ?? "")
-          .toLowerCase()
-          .includes(keyword);
-
-      let matchesStatus = true;
-
-      if (statusFilter === "active") {
-        matchesStatus = item.active && !expired;
-      } else if (statusFilter === "inactive") {
-        matchesStatus = !item.active;
-      } else if (statusFilter === "expired") {
-        matchesStatus = expired;
-      } else if (statusFilter === "bound") {
-        matchesStatus = Boolean(item.deviceId);
-      } else if (statusFilter === "unbound") {
-        matchesStatus = !item.deviceId;
-      }
-
-      return matchesSearch && matchesStatus;
+      const expired = Boolean(item.expiresAt && new Date(item.expiresAt).getTime() < now);
+      const matchesSearch = item.key.toLowerCase().includes(keyword) || (item.deviceId ?? "").toLowerCase().includes(keyword);
+      const statusMatches =
+        statusFilter === "all" ||
+        (statusFilter === "active" && item.active && !expired) ||
+        (statusFilter === "inactive" && !item.active) ||
+        (statusFilter === "expired" && expired) ||
+        (statusFilter === "bound" && Boolean(item.deviceId)) ||
+        (statusFilter === "unbound" && !item.deviceId);
+      return matchesSearch && statusMatches;
     });
   }, [keys, search, statusFilter]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, statusFilter]);
+  useEffect(() => setCurrentPage(1), [search, statusFilter]);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredKeys.length / ITEMS_PER_PAGE)
-  );
-
+  const totalPages = Math.max(1, Math.ceil(filteredKeys.length / ITEMS_PER_PAGE));
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
+    if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
   const paginatedKeys = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredKeys.slice(
-      start,
-      start + ITEMS_PER_PAGE
-    );
+    return filteredKeys.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredKeys, currentPage]);
 
   function exportCSV() {
     if (filteredKeys.length === 0) {
-      setMessage("Tidak ada data untuk diekspor");
+      notify("Tidak ada data untuk diekspor");
       return;
     }
 
-    const escapeCSV = (value: unknown) => {
-      const text = String(value ?? "");
-      return `"${text.replaceAll('"', '""')}"`;
-    };
-
+    const escapeCSV = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
     const rows = filteredKeys.map((item) => [
       item.id,
       item.key,
       item.active ? "Active" : "Nonaktif",
       item.deviceId ?? "Belum digunakan",
       item.useCount ?? 0,
-      item.lastUsed
-        ? new Date(item.lastUsed).toLocaleString("id-ID")
-        : "Belum pernah",
-      item.expiresAt
-        ? new Date(item.expiresAt).toLocaleString("id-ID")
-        : "Permanen",
-      item.createdAt
-        ? new Date(item.createdAt).toLocaleString("id-ID")
-        : "-",
+      item.lastUsed ? new Date(item.lastUsed).toLocaleString("id-ID") : "Belum pernah",
+      item.expiresAt ? new Date(item.expiresAt).toLocaleString("id-ID") : "Permanen",
+      item.createdAt ? new Date(item.createdAt).toLocaleString("id-ID") : "-",
     ]);
 
-    const csv = [
-      [
-        "ID",
-        "Key",
-        "Status",
-        "Device",
-        "Jumlah Pakai",
-        "Terakhir Digunakan",
-        "Expired",
-        "Dibuat",
-      ],
-      ...rows,
-    ]
+    const csv = [["ID", "Key", "Status", "Device", "Jumlah Pakai", "Terakhir Digunakan", "Expired", "Dibuat"], ...rows]
       .map((row) => row.map(escapeCSV).join(","))
       .join("\n");
 
-    const blob = new Blob([`\uFEFF${csv}`], {
-      type: "text/csv;charset=utf-8",
-    });
-
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-
     link.href = url;
-    link.download = `vexdhub-keys-${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
-
+    link.download = `vexdhub-keys-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-
-    setMessage("CSV berhasil diekspor");
+    notify("CSV berhasil diekspor");
+    addActivity("CSV exported", `${filteredKeys.length} license`, "info");
   }
 
-  if (checking) return <div className="login-page"><div className="login-card">Checking admin session...</div></div>;
+  const expiredCount = keys.filter((item) => item.expiresAt && new Date(item.expiresAt).getTime() < Date.now()).length;
+  const activeCount = keys.filter((item) => item.active && !(item.expiresAt && new Date(item.expiresAt).getTime() < Date.now())).length;
+  const deviceCount = keys.filter((item) => item.deviceId).length;
+
+  function navigateTo(section: string) {
+    setActiveSection(section);
+    const element = document.getElementById(section);
+    element?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  if (checking) {
+    return (
+      <main className="center-screen">
+        <div className="loading-orb" />
+        <p>Memeriksa sesi admin...</p>
+      </main>
+    );
+  }
 
   if (!loggedIn) {
-    return <main className="login-page"><div className="login-card"><div className="login-logo">V</div><span className="eyebrow">Secure administration</span><h1>Welcome back</h1><p>Sign in to manage VexdHub licenses and device bindings.</p><div className="login-form"><input type="password" placeholder="Admin password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>{if(e.key==="Enter") void login();}}/><button onClick={()=>void login()}>Sign in</button>{message&&<div className="login-message">{message}</div>}</div></div></main>;
+    return (
+      <main className="auth-screen">
+        <section className="auth-card">
+          <div className="auth-logo">V</div>
+          <p className="eyebrow">VEXDHUB CLOUD</p>
+          <h1>Welcome back</h1>
+          <p className="auth-copy">Masuk ke admin console untuk mengelola seluruh license.</p>
+          <label className="field-label" htmlFor="admin-password">Admin Password</label>
+          <input
+            id="admin-password"
+            type="password"
+            placeholder="Masukkan password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && void login()}
+          />
+          <button type="button" className="button-primary full-width" onClick={() => void login()}>Login to Console</button>
+          {message && <p className="auth-message">{message}</p>}
+        </section>
+      </main>
+    );
   }
 
-  const activeCount=keys.filter(k=>k.active && !(k.expiresAt&&new Date(k.expiresAt).getTime()<Date.now())).length;
-  const expiredCount=keys.filter(k=>k.expiresAt&&new Date(k.expiresAt).getTime()<Date.now()).length;
-  const deviceCount=keys.filter(k=>k.deviceId).length;
+  return (
+    <main className="app-shell">
+      <Sidebar activeSection={activeSection} onSelect={navigateTo} onLogout={() => void logout()} />
 
-  return <div className="admin-shell">
-    <Sidebar activeSection="overview" onSectionChange={(id)=>document.getElementById(id)?.scrollIntoView({behavior:"smooth"})} onLogout={()=>void logout()}/>
-    <main className="admin-main"><div className="content-wrap">
-      <section id="overview"><Header loading={loadingKeys} onRefresh={()=>void loadKeys()}/>
-      <div className="stats-grid"><StatsCard title="Total licenses" value={keys.length} icon="⌁" helper="All generated licenses"/><StatsCard title="Active" value={activeCount} icon="✓" helper="Ready for validation" tone="success"/><StatsCard title="Expired" value={expiredCount} icon="!" helper="Past validity date" tone="warning"/><StatsCard title="Bound devices" value={deviceCount} icon="◇" helper="Locked to a device" tone="violet"/></div></section>
-      <section id="generate" className="panel-grid"><GenerateCard duration={duration} setDuration={setDuration} generateKey={()=>void generateKey()}/><BatchGenerateCard onSuccess={loadKeys} onMessage={setMessage}/></section>
-      <section id="licenses" className="license-section">
-        <div className="section-heading"><div><span className="eyebrow">License inventory</span><h2>Manage licenses</h2><p>Search, filter, copy, reset, disable, or delete licenses.</p></div></div>
-        <div className="license-toolbar"><SearchBar value={search} onChange={setSearch}/><select className="toolbar-select" value={statusFilter} onChange={e=>setStatusFilter(e.target.value as StatusFilter)}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Disabled</option><option value="expired">Expired</option><option value="bound">Device bound</option><option value="unbound">Not bound</option></select><button className="button-secondary" onClick={exportCSV}>Export CSV</button><span className="result-count">Showing {paginatedKeys.length} of {filteredKeys.length}</span></div>
-        {message&&<div className="toast-message"><span>{message}</span><button onClick={()=>setMessage("")}>×</button></div>}
-        <KeyTable keys={paginatedKeys} onDelete={deleteKey} onToggle={toggleKey} onReset={resetDevice} onMessage={setMessage}/>
-        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}/>
-      </section>
-      <section id="settings" style={{height:1}} />
-    </div></main>
-  </div>;
+      <div className="app-main">
+        <Topbar loading={loadingKeys} onRefresh={() => void loadKeys()} />
+
+        {message && <div className="toast-message"><span>✓</span>{message}</div>}
+
+        <section id="overview" className="dashboard-section">
+          <DashboardStats total={keys.length} active={activeCount} expired={expiredCount} devices={deviceCount} />
+
+          <div className="dashboard-grid">
+            <GenerateCard duration={duration} setDuration={setDuration} generateKey={() => void generateKey()} loading={generating} />
+            <BatchGenerateCard
+              onSuccess={loadKeys}
+              onMessage={notify}
+              onActivity={(title, detail) => addActivity(title, detail, "success")}
+            />
+          </div>
+        </section>
+
+        <section id="licenses" className="dashboard-section">
+          <div className="section-heading license-heading">
+            <div>
+              <p className="eyebrow">MANAGEMENT</p>
+              <h2>License Manager</h2>
+              <p className="section-copy">Cari, filter, ekspor, dan kelola seluruh license.</p>
+            </div>
+            <span className="count-badge">{filteredKeys.length} hasil</span>
+          </div>
+
+          <div className="toolbar panel">
+            <SearchBar value={search} onChange={setSearch} />
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+              <option value="all">Semua Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Nonaktif</option>
+              <option value="expired">Expired</option>
+              <option value="bound">Device Terikat</option>
+              <option value="unbound">Belum Terikat</option>
+            </select>
+            <button type="button" className="button-secondary" onClick={exportCSV}>Export CSV</button>
+            <button type="button" className="button-ghost" onClick={() => void loadKeys()} disabled={loadingKeys}>Refresh Data</button>
+          </div>
+
+          <KeyTable keys={paginatedKeys} onDelete={deleteKey} onToggle={toggleKey} onReset={resetDevice} onNotify={notify} />
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        </section>
+
+        <ActivityPanel items={activities} />
+
+        <section id="settings" className="panel settings-panel">
+          <div>
+            <p className="eyebrow">APPEARANCE</p>
+            <h2>Theme Settings</h2>
+            <p className="section-copy">Gunakan pemilih tema di kanan atas. Pilihan tersimpan otomatis di browser.</p>
+          </div>
+          <div className="theme-preview-row">
+            {[
+              ["Default", "#4da3ff"],
+              ["Purple", "#a855f7"],
+              ["Blue Ice", "#38bdf8"],
+              ["Crimson", "#ef4444"],
+              ["Emerald", "#34d399"],
+              ["Gold", "#fbbf24"],
+            ].map(([label, color]) => (
+              <div className="theme-preview" key={label}><span style={{ background: color }} />{label}</div>
+            ))}
+          </div>
+        </section>
+
+        <footer className="app-footer">
+          <span>VexdHub V5</span>
+          <span>Neon Connected</span>
+          <span>© 2026 VexdReal</span>
+        </footer>
+      </div>
+    </main>
+  );
 }

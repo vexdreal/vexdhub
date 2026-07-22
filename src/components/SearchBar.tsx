@@ -6,12 +6,12 @@ type Props = {
 export default function SearchBar({ value, onChange }: Props) {
   return (
     <label className="search-box">
-      <span className="search-icon">⌕</span>
+      <span aria-hidden="true">⌕</span>
       <input
         type="search"
-        placeholder="Search license key or device ID..."
+        placeholder="Cari berdasarkan key atau device ID..."
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(event) => onChange(event.target.value)}
       />
     </label>
   );
