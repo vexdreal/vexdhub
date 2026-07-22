@@ -13,6 +13,19 @@ import KeyTable from "@/components/KeyTable";
 import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
 import StatsCard from "@/components/StatsCard";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
+<div
+  style={{
+    marginBottom: "18px",
+  }}
+>
+  <ThemeSwitcher />
+</div>
+import BatchGenerateCard from "@/components/BatchGenerateCard";
+<BatchGenerateCard
+  onSuccess={loadKeys}
+  onMessage={setMessage}
+/>
 
 type KeyType = {
   id: number;
