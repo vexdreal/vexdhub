@@ -1,31 +1,14 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
+import { useCallback, useEffect, useMemo, useState } from "react";
+import BatchGenerateCard from "@/components/BatchGenerateCard";
 import GenerateCard from "@/components/GenerateCard";
 import Header from "@/components/Header";
 import KeyTable from "@/components/KeyTable";
 import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
+import Sidebar from "@/components/Sidebar";
 import StatsCard from "@/components/StatsCard";
-import ThemeSwitcher from "@/components/ThemeSwitcher";
-<div
-  style={{
-    marginBottom: "18px",
-  }}
->
-  <ThemeSwitcher />
-</div>
-import BatchGenerateCard from "@/components/BatchGenerateCard";
-<BatchGenerateCard
-  onSuccess={loadKeys}
-  onMessage={setMessage}
-/>
 
 type KeyType = {
   id: number;
@@ -382,183 +365,30 @@ export default function Admin() {
     setMessage("CSV berhasil diekspor");
   }
 
-  const expiredCount = keys.filter(
-    (item) =>
-      item.expiresAt &&
-      new Date(item.expiresAt).getTime() < Date.now()
-  ).length;
-
-  if (checking) {
-    return (
-      <main>
-        <p>Memeriksa sesi admin...</p>
-      </main>
-    );
-  }
+  if (checking) return <div className="login-page"><div className="login-card">Checking admin session...</div></div>;
 
   if (!loggedIn) {
-    return (
-      <main>
-        <div className="login-card">
-          <h1>VexdHub Admin</h1>
-
-          <p>Masukkan password admin</p>
-
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(event) =>
-              setPassword(event.target.value)
-            }
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                void login();
-              }
-            }}
-          />
-
-          <button onClick={() => void login()}>
-            Login
-          </button>
-
-          {message && <p>{message}</p>}
-        </div>
-      </main>
-    );
+    return <main className="login-page"><div className="login-card"><div className="login-logo">V</div><span className="eyebrow">Secure administration</span><h1>Welcome back</h1><p>Sign in to manage VexdHub licenses and device bindings.</p><div className="login-form"><input type="password" placeholder="Admin password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>{if(e.key==="Enter") void login();}}/><button onClick={()=>void login()}>Sign in</button>{message&&<div className="login-message">{message}</div>}</div></div></main>;
   }
 
-  return (
-    <main>
-      <div className="login-card">
-        <Header />
+  const activeCount=keys.filter(k=>k.active && !(k.expiresAt&&new Date(k.expiresAt).getTime()<Date.now())).length;
+  const expiredCount=keys.filter(k=>k.expiresAt&&new Date(k.expiresAt).getTime()<Date.now()).length;
+  const deviceCount=keys.filter(k=>k.deviceId).length;
 
-        <button
-          onClick={() => void logout()}
-          style={{ marginBottom: "20px" }}
-        >
-          Logout
-        </button>
-
-        <div
-          style={{
-            display: "flex",
-            gap: "15px",
-            flexWrap: "wrap",
-            marginBottom: "25px",
-          }}
-        >
-          <StatsCard
-            title="Total Key"
-            value={keys.length}
-          />
-
-          <StatsCard
-            title="Active"
-            value={
-              keys.filter((item) => item.active).length
-            }
-          />
-
-          <StatsCard
-            title="Expired"
-            value={expiredCount}
-          />
-
-          <StatsCard
-            title="Device"
-            value={
-              keys.filter((item) => item.deviceId).length
-            }
-          />
-        </div>
-
-        <GenerateCard
-          duration={duration}
-          setDuration={setDuration}
-          generateKey={() => void generateKey()}
-        />
-
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-        />
-
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "10px",
-            marginBottom: "22px",
-          }}
-        >
-          <select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(
-                event.target.value as StatusFilter
-              )
-            }
-            style={{
-              width: "auto",
-              minWidth: "190px",
-              margin: 0,
-            }}
-          >
-            <option value="all">Semua Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Nonaktif</option>
-            <option value="expired">Expired</option>
-            <option value="bound">Device Terikat</option>
-            <option value="unbound">
-              Belum Terikat
-            </option>
-          </select>
-
-          <button onClick={exportCSV}>
-            Export CSV
-          </button>
-
-          <button onClick={() => void loadKeys()}>
-            {loadingKeys ? "Memuat..." : "Refresh Data"}
-          </button>
-
-          <span
-            style={{
-              color: "#9ca3af",
-              marginLeft: "auto",
-            }}
-          >
-            Menampilkan {paginatedKeys.length} dari{" "}
-            {filteredKeys.length} hasil
-          </span>
-        </div>
-
-        {message && (
-          <p
-            style={{
-              marginBottom: "18px",
-              color: "#8ec5ff",
-            }}
-          >
-            {message}
-          </p>
-        )}
-
-        <KeyTable
-          keys={paginatedKeys}
-          onDelete={deleteKey}
-          onToggle={toggleKey}
-          onReset={resetDevice}
-        />
-
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
-      </div>
-    </main>
-  );
+  return <div className="admin-shell">
+    <Sidebar activeSection="overview" onSectionChange={(id)=>document.getElementById(id)?.scrollIntoView({behavior:"smooth"})} onLogout={()=>void logout()}/>
+    <main className="admin-main"><div className="content-wrap">
+      <section id="overview"><Header loading={loadingKeys} onRefresh={()=>void loadKeys()}/>
+      <div className="stats-grid"><StatsCard title="Total licenses" value={keys.length} icon="⌁" helper="All generated licenses"/><StatsCard title="Active" value={activeCount} icon="✓" helper="Ready for validation" tone="success"/><StatsCard title="Expired" value={expiredCount} icon="!" helper="Past validity date" tone="warning"/><StatsCard title="Bound devices" value={deviceCount} icon="◇" helper="Locked to a device" tone="violet"/></div></section>
+      <section id="generate" className="panel-grid"><GenerateCard duration={duration} setDuration={setDuration} generateKey={()=>void generateKey()}/><BatchGenerateCard onSuccess={loadKeys} onMessage={setMessage}/></section>
+      <section id="licenses" className="license-section">
+        <div className="section-heading"><div><span className="eyebrow">License inventory</span><h2>Manage licenses</h2><p>Search, filter, copy, reset, disable, or delete licenses.</p></div></div>
+        <div className="license-toolbar"><SearchBar value={search} onChange={setSearch}/><select className="toolbar-select" value={statusFilter} onChange={e=>setStatusFilter(e.target.value as StatusFilter)}><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Disabled</option><option value="expired">Expired</option><option value="bound">Device bound</option><option value="unbound">Not bound</option></select><button className="button-secondary" onClick={exportCSV}>Export CSV</button><span className="result-count">Showing {paginatedKeys.length} of {filteredKeys.length}</span></div>
+        {message&&<div className="toast-message"><span>{message}</span><button onClick={()=>setMessage("")}>×</button></div>}
+        <KeyTable keys={paginatedKeys} onDelete={deleteKey} onToggle={toggleKey} onReset={resetDevice} onMessage={setMessage}/>
+        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}/>
+      </section>
+      <section id="settings" style={{height:1}} />
+    </div></main>
+  </div>;
 }

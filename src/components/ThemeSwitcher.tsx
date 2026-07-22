@@ -2,18 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-type Theme =
-  | "default"
-  | "purple"
-  | "blue-ice"
-  | "crimson"
-  | "emerald"
-  | "gold";
+type Theme = "default" | "purple" | "blue-ice" | "crimson" | "emerald" | "gold";
 
-const themes: Array<{
-  value: Theme;
-  label: string;
-}> = [
+type Props = { compact?: boolean };
+
+const themes: Array<{ value: Theme; label: string }> = [
   { value: "default", label: "Default Blue" },
   { value: "purple", label: "Purple Neon" },
   { value: "blue-ice", label: "Blue Ice" },
@@ -22,82 +15,41 @@ const themes: Array<{
   { value: "gold", label: "Gold" },
 ];
 
-export default function ThemeSwitcher() {
-  const [theme, setTheme] =
-    useState<Theme>("default");
+export default function ThemeSwitcher({ compact = false }: Props) {
+  const [theme, setTheme] = useState<Theme>("default");
 
   useEffect(() => {
-    const savedTheme =
-      (localStorage.getItem(
-        "vexdhub_theme"
-      ) as Theme | null) ?? "default";
-
-    setTheme(savedTheme);
-    applyTheme(savedTheme);
+    const saved = (localStorage.getItem("vexdhub_theme") as Theme | null) ?? "default";
+    setTheme(saved);
+    applyTheme(saved);
   }, []);
 
-  function applyTheme(selectedTheme: Theme) {
-    if (selectedTheme === "default") {
-      document.documentElement.removeAttribute(
-        "data-theme"
-      );
+  function applyTheme(selected: Theme) {
+    if (selected === "default") {
+      document.documentElement.removeAttribute("data-theme");
     } else {
-      document.documentElement.setAttribute(
-        "data-theme",
-        selectedTheme
-      );
+      document.documentElement.setAttribute("data-theme", selected);
     }
   }
 
-  function changeTheme(selectedTheme: Theme) {
-    setTheme(selectedTheme);
-    localStorage.setItem(
-      "vexdhub_theme",
-      selectedTheme
-    );
-    applyTheme(selectedTheme);
+  function changeTheme(selected: Theme) {
+    setTheme(selected);
+    localStorage.setItem("vexdhub_theme", selected);
+    applyTheme(selected);
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        flexWrap: "wrap",
-      }}
+    <select
+      aria-label="Theme"
+      className={compact ? "theme-select compact" : "theme-select"}
+      value={theme}
+      onChange={(event) => changeTheme(event.target.value as Theme)}
     >
-      <span
-        style={{
-          color: "var(--muted)",
-          fontSize: "14px",
-        }}
-      >
-        Tema:
-      </span>
-
-      <select
-        value={theme}
-        onChange={(event) =>
-          changeTheme(
-            event.target.value as Theme
-          )
-        }
-        style={{
-          width: "auto",
-          minWidth: "170px",
-          margin: 0,
-        }}
-      >
-        {themes.map((item) => (
-          <option
-            key={item.value}
-            value={item.value}
-          >
-            {item.label}
-          </option>
-        ))}
-      </select>
-    </div>
+      {themes.map((item) => (
+        <option key={item.value} value={item.value}>
+          {item.label}
+        </option>
+      ))}
+    </select>
   );
 }

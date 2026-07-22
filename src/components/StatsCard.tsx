@@ -1,39 +1,26 @@
-"use client";
-
 type Props = {
-  title:string;
-  value:number;
+  title: string;
+  value: number;
+  icon: string;
+  helper: string;
+  tone?: "primary" | "success" | "warning" | "violet";
 };
-
 
 export default function StatsCard({
   title,
   value,
-}:Props){
-
+  icon,
+  helper,
+  tone = "primary",
+}: Props) {
   return (
-
-    <div
-      style={{
-        border:"1px solid #444",
-        padding:"20px",
-        borderRadius:"15px",
-        margin:"10px",
-      }}
-    >
-
-      <h3>
-        {title}
-      </h3>
-
-
-      <h1>
-        {value}
-      </h1>
-
-
-    </div>
-
+    <article className={`stat-card tone-${tone}`}>
+      <div className="stat-icon">{icon}</div>
+      <div className="stat-copy">
+        <span>{title}</span>
+        <strong>{value}</strong>
+        <small>{helper}</small>
+      </div>
+    </article>
   );
-
 }

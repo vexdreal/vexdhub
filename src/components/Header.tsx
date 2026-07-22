@@ -1,46 +1,34 @@
-export default function Header() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: "30px",
-      }}
-    >
-      <div>
-        <h1
-          style={{
-            color: "#4da3ff",
-            margin: 0,
-          }}
-        >
-          VexdHub Admin
-        </h1>
+type Props = {
+  loading: boolean;
+  onRefresh: () => void;
+};
 
-        <p
-          style={{
-            color: "#888",
-            marginTop: "5px",
-          }}
-        >
-          Premium Key Management System
-        </p>
+export default function Header({ loading, onRefresh }: Props) {
+  const now = new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date());
+
+  return (
+    <header className="topbar">
+      <div>
+        <span className="eyebrow">VexdHub Control Center</span>
+        <h1>License Overview</h1>
+        <p>Manage activation, device binding, expiry, and usage from one place.</p>
       </div>
 
-      <button
-        onClick={() => location.reload()}
-        style={{
-          padding: "10px 20px",
-          borderRadius: "8px",
-          border: "none",
-          cursor: "pointer",
-          background: "#4da3ff",
-          color: "#fff",
-        }}
-      >
-        Refresh
-      </button>
-    </div>
+      <div className="topbar-actions">
+        <div className="server-pill">
+          <span className="status-dot" />
+          <div>
+            <strong>System online</strong>
+            <small>{now}</small>
+          </div>
+        </div>
+        <button className="button-secondary" type="button" onClick={onRefresh} disabled={loading}>
+          {loading ? "Refreshing..." : "Refresh data"}
+        </button>
+      </div>
+    </header>
   );
 }

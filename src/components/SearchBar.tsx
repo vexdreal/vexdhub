@@ -3,25 +3,16 @@ type Props = {
   onChange: (value: string) => void;
 };
 
-export default function SearchBar({
-  value,
-  onChange,
-}: Props) {
+export default function SearchBar({ value, onChange }: Props) {
   return (
-    <input
-      type="text"
-      placeholder="Cari Key..."
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        width: "100%",
-        padding: "14px",
-        borderRadius: "10px",
-        border: "1px solid #333",
-        background: "#151515",
-        color: "#fff",
-        marginBottom: "20px",
-      }}
-    />
+    <label className="search-box">
+      <span className="search-icon">⌕</span>
+      <input
+        type="search"
+        placeholder="Search license key or device ID..."
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
   );
 }

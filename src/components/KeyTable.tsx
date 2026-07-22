@@ -8,6 +8,7 @@ type KeyItem = {
   deviceId: string | null;
   lastUsed: string | null;
   useCount: number;
+  createdAt?: string;
 };
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
   onDelete: (id: number) => void;
   onToggle: (id: number) => void;
   onReset: (id: number) => void;
+  onMessage?: (message: string) => void;
 };
 
 export default function KeyTable({
@@ -22,300 +24,122 @@ export default function KeyTable({
   onDelete,
   onToggle,
   onReset,
+  onMessage,
 }: Props) {
   async function copyText(text: string, label: string) {
     try {
       await navigator.clipboard.writeText(text);
-      alert(`${label} berhasil disalin`);
+      onMessage?.(`${label} copied to clipboard`);
     } catch {
-      alert(`Gagal menyalin ${label}`);
+      onMessage?.(`Failed to copy ${label.toLowerCase()}`);
     }
   }
 
   function confirmDelete(id: number, key: string) {
-    const confirmed = window.confirm(
-      `Yakin ingin menghapus key ${key} secara permanen?`
-    );
-
-    if (confirmed) {
+    if (window.confirm(`Delete ${key} permanently? This action cannot be undone.`)) {
       onDelete(id);
     }
   }
 
   function confirmReset(id: number, key: string) {
-    const confirmed = window.confirm(
-      `Reset device untuk key ${key}?`
-    );
-
-    if (confirmed) {
+    if (window.confirm(`Reset the bound device for ${key}?`)) {
       onReset(id);
     }
   }
 
+  function formatDate(value: string | null, empty: string) {
+    if (!value) return empty;
+    return new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  }
+
   if (keys.length === 0) {
     return (
-      <section>
-        <h2>Daftar License Key</h2>
-        <p>Belum ada key.</p>
-      </section>
+      <div className="empty-state">
+        <div className="empty-icon">⌁</div>
+        <h3>No licenses found</h3>
+        <p>Try another filter or generate a new license.</p>
+      </div>
     );
   }
 
   return (
-    <section>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "16px",
-          marginBottom: "18px",
-        }}
-      >
-        <h2 style={{ margin: 0 }}>
-          Daftar License Key
-        </h2>
+    <div className="license-grid">
+      {keys.map((item) => {
+        const expired = Boolean(
+          item.expiresAt && new Date(item.expiresAt).getTime() < Date.now()
+        );
+        const status = !item.active ? "Disabled" : expired ? "Expired" : "Active";
+        const statusClass = !item.active ? "disabled" : expired ? "expired" : "active";
 
-        <span
-          style={{
-            color: "#9aa4b2",
-            fontSize: "14px",
-          }}
-        >
-          {keys.length} license
-        </span>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: "16px",
-        }}
-      >
-        {keys.map((item) => {
-          const isExpired =
-            item.expiresAt !== null &&
-            new Date(item.expiresAt).getTime() < Date.now();
-
-          const statusText = !item.active
-            ? "Nonaktif"
-            : isExpired
-              ? "Expired"
-              : "Active";
-
-          const statusColor = !item.active
-            ? "#ff6b6b"
-            : isExpired
-              ? "#ffb84d"
-              : "#53e08c";
-
-          return (
-            <article
-              key={item.id}
-              style={{
-                padding: "20px",
-                borderRadius: "18px",
-                border:
-                  "1px solid rgba(255,255,255,0.12)",
-                background:
-                  "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025))",
-                boxShadow:
-                  "0 12px 30px rgba(0,0,0,0.18)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                  marginBottom: "18px",
-                }}
-              >
-                <div>
-                  <p
-                    style={{
-                      color: "#9aa4b2",
-                      fontSize: "13px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    License Key
-                  </p>
-
-                  <strong
-                    style={{
-                      fontSize: "17px",
-                      wordBreak: "break-all",
-                    }}
-                  >
-                    {item.key}
-                  </strong>
-                </div>
-
-                <span
-                  style={{
-                    color: statusColor,
-                    background: `${statusColor}18`,
-                    border: `1px solid ${statusColor}55`,
-                    borderRadius: "999px",
-                    padding: "6px 10px",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {statusText}
-                </span>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "14px",
-                }}
-              >
-                <InfoItem
-                  label="Device"
-                  value={
-                    item.deviceId
-                      ? `${item.deviceId.slice(0, 20)}...`
-                      : "Belum digunakan"
-                  }
-                />
-
-                <InfoItem
-                  label="Dipakai"
-                  value={`${item.useCount ?? 0} kali`}
-                />
-
-                <InfoItem
-                  label="Terakhir digunakan"
-                  value={
-                    item.lastUsed
-                      ? new Date(item.lastUsed).toLocaleString(
-                          "id-ID"
-                        )
-                      : "Belum pernah"
-                  }
-                />
-
-                <InfoItem
-                  label="Expired"
-                  value={
-                    item.expiresAt
-                      ? new Date(item.expiresAt).toLocaleString(
-                          "id-ID"
-                        )
-                      : "Permanen"
-                  }
-                />
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(2, minmax(0, 1fr))",
-                  gap: "10px",
-                  marginTop: "20px",
-                }}
-              >
+        return (
+          <article className="license-card" key={item.id}>
+            <div className="license-card-head">
+              <div>
+                <span className="eyebrow">License key</span>
                 <button
-                  onClick={() => copyText(item.key, "Key")}
+                  type="button"
+                  className="license-key"
+                  title="Copy license key"
+                  onClick={() => void copyText(item.key, "License key")}
                 >
-                  Copy Key
-                </button>
-
-                {item.deviceId ? (
-                  <button
-                    onClick={() =>
-                      copyText(item.deviceId as string, "Device ID")
-                    }
-                  >
-                    Copy Device
-                  </button>
-                ) : (
-                  <button disabled>
-                    Belum Terikat
-                  </button>
-                )}
-
-                <button
-                  onClick={() => onToggle(item.id)}
-                >
-                  {item.active
-                    ? "Nonaktifkan"
-                    : "Aktifkan"}
-                </button>
-
-                <button
-                  onClick={() =>
-                    confirmReset(item.id, item.key)
-                  }
-                >
-                  Reset Device
-                </button>
-
-                <button
-                  onClick={() =>
-                    confirmDelete(item.id, item.key)
-                  }
-                  style={{
-                    gridColumn: "1 / -1",
-                    background:
-                      "linear-gradient(135deg, #ef4444, #b91c1c)",
-                  }}
-                >
-                  Hapus License
+                  {item.key}
                 </button>
               </div>
-            </article>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
+              <span className={`status-badge ${statusClass}`}>
+                <span /> {status}
+              </span>
+            </div>
 
-function InfoItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div
-      style={{
-        padding: "12px",
-        borderRadius: "12px",
-        background: "rgba(0,0,0,0.22)",
-        border: "1px solid rgba(255,255,255,0.08)",
-      }}
-    >
-      <p
-        style={{
-          color: "#9aa4b2",
-          fontSize: "12px",
-          marginBottom: "5px",
-        }}
-      >
-        {label}
-      </p>
+            <div className="license-meta-grid">
+              <div className="meta-box wide">
+                <span>Device binding</span>
+                <strong title={item.deviceId ?? "Not bound"}>
+                  {item.deviceId ? `${item.deviceId.slice(0, 24)}…` : "Not bound yet"}
+                </strong>
+              </div>
+              <div className="meta-box">
+                <span>Usage</span>
+                <strong>{item.useCount ?? 0} times</strong>
+              </div>
+              <div className="meta-box">
+                <span>Last used</span>
+                <strong>{formatDate(item.lastUsed, "Never")}</strong>
+              </div>
+              <div className="meta-box wide">
+                <span>Expires</span>
+                <strong>{formatDate(item.expiresAt, "Permanent")}</strong>
+              </div>
+            </div>
 
-      <p
-        style={{
-          margin: 0,
-          fontWeight: 600,
-          wordBreak: "break-word",
-        }}
-      >
-        {value}
-      </p>
+            <div className="license-actions">
+              <button type="button" className="button-secondary" onClick={() => void copyText(item.key, "License key")}>Copy key</button>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={!item.deviceId}
+                onClick={() => item.deviceId && void copyText(item.deviceId, "Device ID")}
+              >
+                Copy device
+              </button>
+              <button type="button" className="button-secondary" onClick={() => onToggle(item.id)}>
+                {item.active ? "Disable" : "Enable"}
+              </button>
+              <button type="button" className="button-secondary" disabled={!item.deviceId} onClick={() => confirmReset(item.id, item.key)}>
+                Reset device
+              </button>
+              <button type="button" className="button-danger" onClick={() => confirmDelete(item.id, item.key)}>
+                Delete license
+              </button>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
