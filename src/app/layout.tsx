@@ -18,24 +18,22 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://vexdhub.vercel.app"),
 
   title: {
-    default: "VexdHub",
-    template: "%s | VexdHub",
+    default: "VexdHub • Smart License System",
+    template: "%s • VexdHub",
   },
 
   description:
-    "VexdHub - Premium License Management Platform",
+    "VexdHub adalah platform pengelolaan license dan key system modern.",
 
   applicationName: "VexdHub",
 
   keywords: [
     "VexdHub",
-    "License",
     "License System",
     "Key System",
-    "Premium",
-    "Dashboard",
-    "Admin Panel",
     "License Manager",
+    "Admin Dashboard",
+    "VexdReal",
   ],
 
   authors: [
@@ -48,30 +46,57 @@ export const metadata: Metadata = {
   publisher: "VexdReal",
 
   robots: {
-    index: true,
-    follow: true,
+    index: false,
+    follow: false,
   },
 
   icons: {
-    icon: "/branding/favicon.ico",
+    icon: [
+      {
+        url: "/branding/favicon.ico",
+        sizes: "any",
+      },
+      {
+        url: "/branding/logo.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
+
     shortcut: "/branding/favicon.ico",
-    apple: "/branding/apple-touch-icon.png",
+
+    apple: [
+      {
+        url: "/branding/apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
   },
 
   openGraph: {
-    title: "VexdHub",
+    title: "VexdHub • Smart License System",
     description:
-      "Premium License Management Platform",
+      "Platform modern untuk mengelola license, device, activation, dan key system.",
     siteName: "VexdHub",
-    type: "website",
     locale: "id_ID",
+    type: "website",
+    images: [
+      {
+        url: "/branding/logo.png",
+        width: 512,
+        height: 512,
+        alt: "VexdHub Logo",
+      },
+    ],
   },
 
   twitter: {
-    card: "summary_large_image",
-    title: "VexdHub",
+    card: "summary",
+    title: "VexdHub • Smart License System",
     description:
-      "Premium License Management Platform",
+      "Platform modern untuk mengelola license dan key system.",
+    images: ["/branding/logo.png"],
   },
 };
 

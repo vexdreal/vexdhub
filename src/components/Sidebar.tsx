@@ -7,10 +7,26 @@ type Props = {
 };
 
 const items = [
-  { id: "overview", icon: "▦", label: "Overview" },
-  { id: "licenses", icon: "◇", label: "Licenses" },
-  { id: "activity", icon: "↻", label: "Activity" },
-  { id: "settings", icon: "⚙", label: "Appearance" },
+  {
+    id: "overview",
+    icon: "▦",
+    label: "Overview",
+  },
+  {
+    id: "licenses",
+    icon: "◇",
+    label: "Licenses",
+  },
+  {
+    id: "activity",
+    icon: "↻",
+    label: "Activity",
+  },
+  {
+    id: "settings",
+    icon: "⚙",
+    label: "Appearance",
+  },
 ];
 
 export default function Sidebar({
@@ -20,33 +36,26 @@ export default function Sidebar({
 }: Props) {
   return (
     <aside className="app-sidebar">
-      <button
-        type="button"
-        className="sidebar-brand"
-        onClick={() => onSelect("overview")}
-        aria-label="Buka overview"
-      >
+      <div className="sidebar-brand">
         <img
           src="/branding/logo.png"
-          alt="Logo VexdHub"
+          alt="VexdHub Logo"
           className="sidebar-brand-logo"
         />
 
-        <div className="sidebar-brand-copy">
-          <strong>
-            <span>VEXD</span>
-            <span>HUB</span>
-          </strong>
-
-          <small>Smart License System</small>
+        <div className="sidebar-brand-text">
+          <strong>VEXDHUB</strong>
+          <span>Smart License System</span>
         </div>
-      </button>
+      </div>
 
       <nav
         className="sidebar-nav"
         aria-label="Admin navigation"
       >
-        <p className="sidebar-label">Workspace</p>
+        <p className="sidebar-label">
+          Workspace
+        </p>
 
         {items.map((item) => (
           <button

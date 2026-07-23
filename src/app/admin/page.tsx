@@ -8,14 +8,14 @@ import {
 } from "react";
 
 import ActivityPanel from "@/components/ActivityPanel";
-import BatchGenerateCard from "@/components/BatchGenerateCard";
-import DashboardStats from "@/components/DashboardStats";
-import GenerateCard from "@/components/GenerateCard";
 import KeyTable from "@/components/KeyTable";
 import Pagination from "@/components/Pagination";
 import SearchBar from "@/components/SearchBar";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
+import AdminAuthView from "@/components/AdminAuthView";
+import OverviewSection from "@/components/OverviewSection";
+import LicenseDetailModal from "@/components/LicenseDetailModal";
 
 type KeyType = {
   id: number;
@@ -37,6 +37,7 @@ type StatusFilter =
   | "unbound";
 
 type ActivityItem = {
+  id: number;
   title: string;
   detail: string;
   time: string;
@@ -69,34 +70,38 @@ export default function Admin() {
     ActivityItem[]
   >([]);
 
-  const addActivity = useCallback(
-    (
-      title: string,
-      detail: string,
-      tone: ActivityItem["tone"] = "info"
-    ) => {
-      const time = new Date().toLocaleTimeString(
-        "id-ID",
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      );
+  const [selectedLicense, setSelectedLicense] =
+  useState<KeyType | null>(null);
 
-      setActivities((current) =>
-        [
-          {
-            title,
-            detail,
-            time,
-            tone,
-          },
-          ...current,
-        ].slice(0, 8)
-      );
-    },
-    []
-  );
+  const addActivity = useCallback(
+  (
+    title: string,
+    detail: string,
+    tone: ActivityItem["tone"] = "info"
+  ) => {
+    const time = new Date().toLocaleTimeString(
+      "id-ID",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    );
+
+    setActivities((current) =>
+      [
+        {
+          id: Date.now(),
+          title,
+          detail,
+          time,
+          tone,
+        },
+        ...current,
+      ].slice(0, 50)
+    );
+  },
+  []
+);
 
   const notify = useCallback((text: string) => {
     setMessage(text);
@@ -165,6 +170,52 @@ export default function Admin() {
     }
   }, [notify]);
 
+  const loadActivities = useCallback(async () => {
+  try {
+    const response = await fetch("/api/activity", {
+      cache: "no-store",
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.message ?? "Gagal mengambil activity"
+      );
+    }
+
+    const formattedActivities: ActivityItem[] =
+      data.activities.map(
+        (item: {
+          id: number;
+          action: string;
+          detail: string;
+          tone: string;
+          createdAt: string;
+        }) => ({
+          id: item.id,
+          title: item.action,
+          detail: item.detail,
+          tone:
+            item.tone === "success" ||
+            item.tone === "warning"
+              ? item.tone
+              : "info",
+          time: new Date(
+            item.createdAt
+          ).toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        })
+      );
+
+    setActivities(formattedActivities);
+  } catch (error) {
+    console.error("Load activity error:", error);
+  }
+}, []);
+
   const checkSession = useCallback(async () => {
     try {
       const response = await fetch(
@@ -180,7 +231,10 @@ export default function Admin() {
         setLoggedIn(true);
         setChecking(false);
 
-        void loadKeys();
+        void Promise.all([
+  loadKeys(),
+  loadActivities(),
+]);
 
         return;
       }
@@ -191,11 +245,23 @@ export default function Admin() {
     } finally {
       setChecking(false);
     }
-  }, [loadKeys, notify]);
-
+  }, [loadActivities, loadKeys, notify]);
   useEffect(() => {
     void checkSession();
   }, [checkSession]);
+  useEffect(() => {
+  if (!loggedIn) {
+    return;
+  }
+
+  const interval = window.setInterval(() => {
+    void loadActivities();
+  }, 15000);
+
+  return () => {
+    window.clearInterval(interval);
+  };
+}, [loggedIn, loadActivities]);
   
 
   async function login() {
@@ -231,7 +297,10 @@ export default function Admin() {
         "success"
       );
 
-      void loadKeys();
+      await Promise.all([
+        loadKeys(),
+        loadActivities(),
+      ]);
     } catch {
       notify("Login gagal. Coba lagi.");
     }
@@ -319,6 +388,9 @@ export default function Admin() {
       createdKey.key,
       "success"
     );
+
+    void loadActivities();
+
   } catch (error) {
     setNewKey("");
 
@@ -360,12 +432,15 @@ export default function Admin() {
       notify("License berhasil dihapus");
 
       addActivity(
-        "License deleted",
-        target?.key ?? `ID ${id}`,
-        "warning"
-      );
+  "License deleted",
+  target?.key ?? `ID ${id}`,
+  "warning"
+);
 
-      void loadKeys();
+void Promise.all([
+  loadKeys(),
+  loadActivities(),
+]);
     } catch {
       notify("Gagal menghapus license");
     }
@@ -400,12 +475,15 @@ export default function Admin() {
       notify("Device berhasil direset");
 
       addActivity(
-        "Device reset",
-        target?.key ?? `ID ${id}`,
-        "info"
-      );
+  "Device reset",
+  target?.key ?? `ID ${id}`,
+  "info"
+);
 
-      void loadKeys();
+void Promise.all([
+  loadKeys(),
+  loadActivities(),
+]);
     } catch {
       notify("Gagal mereset device");
     }
@@ -597,27 +675,6 @@ export default function Admin() {
     );
   }
 
-  const expiredCount = keys.filter(
-    (item) =>
-      item.expiresAt &&
-      new Date(item.expiresAt).getTime() <
-        Date.now()
-  ).length;
-
-  const activeCount = keys.filter(
-    (item) =>
-      item.active &&
-      !(
-        item.expiresAt &&
-        new Date(item.expiresAt).getTime() <
-          Date.now()
-      )
-  ).length;
-
-  const deviceCount = keys.filter(
-    (item) => item.deviceId
-  ).length;
-
   function navigateTo(section: string) {
     setActiveSection(section);
 
@@ -630,71 +687,20 @@ export default function Admin() {
     });
   }
 
-  if (checking) {
-    return (
-      <main className="center-screen">
-        <div className="loading-orb" />
-        <p>Memeriksa sesi admin...</p>
-      </main>
-    );
-  }
+ const authView = (
+  <AdminAuthView
+    checking={checking}
+    loggedIn={loggedIn}
+    password={password}
+    message={message}
+    setPassword={setPassword}
+    onLogin={() => void login()}
+  />
+);
 
-  if (!loggedIn) {
-    return (
-      <main className="auth-screen">
-        <section className="auth-card">
-          <div className="auth-logo">V</div>
-
-          <p className="eyebrow">
-            VEXDHUB CLOUD
-          </p>
-
-          <h1>Welcome back</h1>
-
-          <p className="auth-copy">
-            Masuk ke admin console untuk
-            mengelola seluruh license.
-          </p>
-
-          <label
-            className="field-label"
-            htmlFor="admin-password"
-          >
-            Admin Password
-          </label>
-
-          <input
-            id="admin-password"
-            type="password"
-            placeholder="Masukkan password"
-            value={password}
-            onChange={(event) =>
-              setPassword(event.target.value)
-            }
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                void login();
-              }
-            }}
-          />
-
-          <button
-            type="button"
-            className="button-primary full-width"
-            onClick={() => void login()}
-          >
-            Login to Console
-          </button>
-
-          {message && (
-            <p className="auth-message">
-              {message}
-            </p>
-          )}
-        </section>
-      </main>
-    );
-  }
+if (checking || !loggedIn) {
+  return authView;
+}
 
   return (
     <main className="app-shell">
@@ -717,57 +723,19 @@ export default function Admin() {
           </div>
         )}
 
-        <section
-          id="overview"
-          className="dashboard-section"
-        >
-          <DashboardStats
-  total={keys.length}
-  active={activeCount}
-  expired={expiredCount}
-  devices={deviceCount}
-  today={
-    keys.filter((item) => {
-      const created = new Date(item.createdAt);
-      const today = new Date();
-
-      return (
-        created.getDate() === today.getDate() &&
-        created.getMonth() === today.getMonth() &&
-        created.getFullYear() === today.getFullYear()
-      );
-    }).length
+ <OverviewSection
+  keys={keys}
+  duration={duration}
+  generating={generating}
+  generatedKey={newKey}
+  setDuration={setDuration}
+  onGenerate={() => void generateKey()}
+  onLoadKeys={loadKeys}
+  onMessage={notify}
+  onActivity={(title, detail) =>
+    addActivity(title, detail, "success")
   }
-  activation={keys.reduce(
-    (total, item) => total + item.useCount,
-    0
-  )}
 />
-
-          <div className="dashboard-grid">
-            <GenerateCard
-              duration={duration}
-              setDuration={setDuration}
-              generateKey={() =>
-                void generateKey()
-              }
-              loading={generating}
-              generatedKey={newKey}
-            />
-
-            <BatchGenerateCard
-              onSuccess={loadKeys}
-              onMessage={notify}
-              onActivity={(title, detail) =>
-                addActivity(
-                  title,
-                  detail,
-                  "success"
-                )
-              }
-            />
-          </div>
-        </section>
 
         <section
           id="licenses"
@@ -775,15 +743,12 @@ export default function Admin() {
         >
           <div className="section-heading license-heading">
             <div>
-              <p className="eyebrow">
-                MANAGEMENT
-              </p>
+              <p className="eyebrow">MANAGEMENT</p>
 
               <h2>License Manager</h2>
 
               <p className="section-copy">
-                Cari, filter, ekspor, dan kelola
-                seluruh license.
+                Cari, filter, ekspor, dan kelola seluruh license.
               </p>
             </div>
 
@@ -857,11 +822,12 @@ export default function Admin() {
           ) : (
             <>
               <KeyTable
-                keys={paginatedKeys}
-                onDelete={deleteKey}
-                onToggle={toggleKey}
-                onReset={resetDevice}
-                onNotify={notify}
+               keys={paginatedKeys}
+               onDetail={setSelectedLicense}
+               onDelete={deleteKey}
+               onToggle={toggleKey}
+               onReset={resetDevice}
+               onNotify={notify}
               />
 
               <Pagination
@@ -924,6 +890,17 @@ export default function Admin() {
           <span>© 2026 VexdReal</span>
         </footer>
       </div>
+      <LicenseDetailModal
+        license={selectedLicense}
+        onClose={() => setSelectedLicense(null)}
+        onReset={(id) => {
+          void resetDevice(id);
+        }}
+        onDelete={(id) => {
+          void deleteKey(id);
+        }}
+        onNotify={notify}
+     />
     </main>
   );
 }

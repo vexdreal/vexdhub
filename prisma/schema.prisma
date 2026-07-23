@@ -18,3 +18,11 @@ model Key {
 
   createdAt DateTime @default(now())
 }
+
+model Activity {
+  id        Int      @id @default(autoincrement())
+  action    String
+  detail    String
+  tone      String   @default("info")
+  createdAt DateTime @default(now())
+}

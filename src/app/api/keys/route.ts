@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendDiscordLog } from "@/lib/discord";
+import { createActivity } from "@/lib/activity";
 
+// ========================
 // GET SEMUA KEY
+// ========================
 export async function GET() {
   try {
     const keys = await prisma.key.findMany({
@@ -27,13 +30,18 @@ export async function GET() {
   }
 }
 
+// ========================
 // CREATE KEY
+// ========================
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const newKey = body.key;
-    const duration = body.duration;
+    const newKey = String(body.key ?? "")
+      .trim()
+      .toUpperCase();
+
+    const duration = String(body.duration ?? "0").trim();
 
     if (!newKey) {
       return NextResponse.json(
@@ -47,16 +55,48 @@ export async function POST(req: Request) {
       );
     }
 
+    const existingKey = await prisma.key.findUnique({
+      where: {
+        key: newKey,
+      },
+    });
+
+    if (existingKey) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Key sudah tersedia di database",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
     let expiresAt: Date | null = null;
 
-    if (duration && duration !== "0") {
-      const date = new Date();
+    if (duration !== "0") {
+      const durationNumber = Number(duration);
 
-      date.setDate(
-        date.getDate() + Number(duration)
+      if (
+        !Number.isInteger(durationNumber) ||
+        durationNumber <= 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Durasi tidak valid",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      expiresAt = new Date();
+      expiresAt.setDate(
+        expiresAt.getDate() + durationNumber
       );
-
-      expiresAt = date;
     }
 
     const key = await prisma.key.create({
@@ -66,7 +106,14 @@ export async function POST(req: Request) {
       },
     });
 
-    await sendDiscordLog({
+    await createActivity({
+      action: "License generated",
+      detail: key.key,
+      tone: "success",
+    });
+
+    // Discord berjalan di belakang agar generate tidak tertahan
+    void sendDiscordLog({
       title: "🔑 License Generated",
       color: 0x22c55e,
       fields: [
@@ -93,11 +140,16 @@ export async function POST(req: Request) {
       ],
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Key berhasil dibuat",
-      data: key,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Key berhasil dibuat",
+        data: key,
+      },
+      {
+        status: 201,
+      }
+    );
   } catch (error) {
     console.error("POST key error:", error);
 
@@ -113,19 +165,21 @@ export async function POST(req: Request) {
   }
 }
 
+// ========================
 // DELETE KEY / RESET DEVICE
+// ========================
 export async function DELETE(req: Request) {
   try {
     const body = await req.json();
 
     const id = Number(body.id);
-    const resetDevice = Boolean(body.resetDevice);
+    const resetDevice = body.resetDevice === true;
 
-    if (!id) {
+    if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json(
         {
           success: false,
-          message: "ID tidak ditemukan",
+          message: "ID tidak valid",
         },
         {
           status: 400,
@@ -151,7 +205,9 @@ export async function DELETE(req: Request) {
       );
     }
 
+    // ========================
     // RESET DEVICE
+    // ========================
     if (resetDevice) {
       const updatedKey = await prisma.key.update({
         where: {
@@ -164,13 +220,19 @@ export async function DELETE(req: Request) {
         },
       });
 
-      await sendDiscordLog({
+      await createActivity({
+        action: "Device reset",
+        detail: existingKey.key,
+        tone: "info",
+      });
+
+      void sendDiscordLog({
         title: "🔄 Device Reset",
         color: 0x3b82f6,
         fields: [
           {
             name: "Key",
-            value: updatedKey.key,
+            value: existingKey.key,
             inline: false,
           },
           {
@@ -188,14 +250,22 @@ export async function DELETE(req: Request) {
       });
     }
 
+    // ========================
     // HAPUS KEY PERMANEN
+    // ========================
     await prisma.key.delete({
       where: {
         id,
       },
     });
 
-    await sendDiscordLog({
+    await createActivity({
+      action: "License deleted",
+      detail: existingKey.key,
+      tone: "warning",
+    });
+
+    void sendDiscordLog({
       title: "🗑️ License Deleted",
       color: 0xef4444,
       fields: [
