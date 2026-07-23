@@ -1,13 +1,42 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/auth";
 import { sendDiscordLog } from "@/lib/discord";
 import { createActivity } from "@/lib/activity";
+
+function unauthorizedResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      message: "Akses ditolak",
+    },
+    {
+      status: 401,
+    }
+  );
+}
+
+async function sendDiscordSafely(
+  payload: Parameters<typeof sendDiscordLog>[0]
+) {
+  try {
+    await sendDiscordLog(payload);
+  } catch (error) {
+    console.error("Discord log error:", error);
+  }
+}
 
 // ========================
 // GET SEMUA KEY
 // ========================
 export async function GET() {
   try {
+    if (!(await isAdmin())) {
+      return unauthorizedResponse();
+    }
+
     const keys = await prisma.key.findMany({
       orderBy: {
         createdAt: "desc",
@@ -35,13 +64,41 @@ export async function GET() {
 // ========================
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    if (!(await isAdmin())) {
+      return unauthorizedResponse();
+    }
 
-    const newKey = String(body.key ?? "")
+    const body: unknown = await req.json();
+
+    if (
+      typeof body !== "object" ||
+      body === null
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Request tidak valid",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const requestBody = body as {
+      key?: unknown;
+      duration?: unknown;
+    };
+
+    const newKey = String(
+      requestBody.key ?? ""
+    )
       .trim()
       .toUpperCase();
 
-    const duration = String(body.duration ?? "0").trim();
+    const duration = String(
+      requestBody.duration ?? "0"
+    ).trim();
 
     if (!newKey) {
       return NextResponse.json(
@@ -55,20 +112,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const existingKey = await prisma.key.findUnique({
-      where: {
-        key: newKey,
-      },
-    });
-
-    if (existingKey) {
+    if (
+      newKey.length < 8 ||
+      newKey.length > 100
+    ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Key sudah tersedia di database",
+          message: "Format key tidak valid",
         },
         {
-          status: 409,
+          status: 400,
         }
       );
     }
@@ -80,7 +134,8 @@ export async function POST(req: Request) {
 
       if (
         !Number.isInteger(durationNumber) ||
-        durationNumber <= 0
+        durationNumber <= 0 ||
+        durationNumber > 36500
       ) {
         return NextResponse.json(
           {
@@ -112,8 +167,7 @@ export async function POST(req: Request) {
       tone: "success",
     });
 
-    // Discord berjalan di belakang agar generate tidak tertahan
-    void sendDiscordLog({
+    await sendDiscordSafely({
       title: "🔑 License Generated",
       color: 0x22c55e,
       fields: [
@@ -133,7 +187,9 @@ export async function POST(req: Request) {
         {
           name: "Expired",
           value: key.expiresAt
-            ? key.expiresAt.toLocaleString("id-ID")
+            ? key.expiresAt.toLocaleString(
+                "id-ID"
+              )
             : "Permanen",
           inline: true,
         },
@@ -151,6 +207,23 @@ export async function POST(req: Request) {
       }
     );
   } catch (error) {
+    if (
+      error instanceof
+        Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Key sudah tersedia di database",
+        },
+        {
+          status: 409,
+        }
+      );
+    }
+
     console.error("POST key error:", error);
 
     return NextResponse.json(
@@ -170,10 +243,35 @@ export async function POST(req: Request) {
 // ========================
 export async function DELETE(req: Request) {
   try {
-    const body = await req.json();
+    if (!(await isAdmin())) {
+      return unauthorizedResponse();
+    }
 
-    const id = Number(body.id);
-    const resetDevice = body.resetDevice === true;
+    const body: unknown = await req.json();
+
+    if (
+      typeof body !== "object" ||
+      body === null
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Request tidak valid",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const requestBody = body as {
+      id?: unknown;
+      resetDevice?: unknown;
+    };
+
+    const id = Number(requestBody.id);
+    const resetDevice =
+      requestBody.resetDevice === true;
 
     if (!Number.isInteger(id) || id <= 0) {
       return NextResponse.json(
@@ -187,11 +285,12 @@ export async function DELETE(req: Request) {
       );
     }
 
-    const existingKey = await prisma.key.findUnique({
-      where: {
-        id,
-      },
-    });
+    const existingKey =
+      await prisma.key.findUnique({
+        where: {
+          id,
+        },
+      });
 
     if (!existingKey) {
       return NextResponse.json(
@@ -209,16 +308,17 @@ export async function DELETE(req: Request) {
     // RESET DEVICE
     // ========================
     if (resetDevice) {
-      const updatedKey = await prisma.key.update({
-        where: {
-          id,
-        },
-        data: {
-          deviceId: null,
-          lastUsed: null,
-          useCount: 0,
-        },
-      });
+      const updatedKey =
+        await prisma.key.update({
+          where: {
+            id,
+          },
+          data: {
+            deviceId: null,
+            lastUsed: null,
+            useCount: 0,
+          },
+        });
 
       await createActivity({
         action: "Device reset",
@@ -226,7 +326,7 @@ export async function DELETE(req: Request) {
         tone: "info",
       });
 
-      void sendDiscordLog({
+      await sendDiscordSafely({
         title: "🔄 Device Reset",
         color: 0x3b82f6,
         fields: [
@@ -265,7 +365,7 @@ export async function DELETE(req: Request) {
       tone: "warning",
     });
 
-    void sendDiscordLog({
+    await sendDiscordSafely({
       title: "🗑️ License Deleted",
       color: 0xef4444,
       fields: [
@@ -287,12 +387,29 @@ export async function DELETE(req: Request) {
       message: "Key berhasil dihapus",
     });
   } catch (error) {
+    if (
+      error instanceof
+        Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Key tidak ditemukan",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
     console.error("DELETE key error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: "Terjadi kesalahan pada server",
+        message:
+          "Terjadi kesalahan pada server",
       },
       {
         status: 500,

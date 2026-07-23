@@ -895,10 +895,10 @@ if (checking || !loggedIn) {
         onClose={() => setSelectedLicense(null)}
         onReset={(id) => {
           void resetDevice(id);
-        }}
+      }}
         onDelete={(id) => {
-          void deleteKey(id);
-        }}
+        void deleteKey(id);
+      }}
         onNotify={notify}
      />
     </main>

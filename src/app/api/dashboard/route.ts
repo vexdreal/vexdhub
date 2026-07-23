@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
+
 import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/auth";
+
+function unauthorizedResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      message: "Akses ditolak",
+    },
+    {
+      status: 401,
+    }
+  );
+}
 
 export async function GET() {
   try {
+    if (!(await isAdmin())) {
+      return unauthorizedResponse();
+    }
+
     const now = new Date();
 
     const today = new Date();
@@ -21,6 +39,16 @@ export async function GET() {
       prisma.key.count({
         where: {
           active: true,
+          OR: [
+            {
+              expiresAt: null,
+            },
+            {
+              expiresAt: {
+                gte: now,
+              },
+            },
+          ],
         },
       }),
 
@@ -57,18 +85,21 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-
       stats: {
         totalLicense,
         activeLicense,
         expiredLicense,
         registeredDevice,
         todayGenerated,
-        totalActivation: totalUse._sum.useCount ?? 0,
+        totalActivation:
+          totalUse._sum.useCount ?? 0,
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Dashboard API error:",
+      error
+    );
 
     return NextResponse.json(
       {

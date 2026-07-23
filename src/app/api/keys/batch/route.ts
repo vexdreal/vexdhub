@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/auth";
+import { createActivity } from "@/lib/activity";
+import { sendDiscordLog } from "@/lib/discord";
 
 function createLicenseKey() {
   const random = crypto
@@ -12,26 +15,60 @@ function createLicenseKey() {
   return `VEXD-${random}`;
 }
 
+function unauthorizedResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      message: "Tidak memiliki akses admin",
+    },
+    {
+      status: 401,
+    }
+  );
+}
+
+async function sendDiscordSafely(
+  payload: Parameters<typeof sendDiscordLog>[0]
+) {
+  try {
+    await sendDiscordLog(payload);
+  } catch (error) {
+    console.error("Discord batch log error:", error);
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    const admin = await isAdmin();
+    if (!(await isAdmin())) {
+      return unauthorizedResponse();
+    }
 
-    if (!admin) {
+    const body: unknown = await req.json();
+
+    if (
+      typeof body !== "object" ||
+      body === null
+    ) {
       return NextResponse.json(
         {
           success: false,
-          message: "Tidak memiliki akses admin",
+          message: "Request tidak valid",
         },
         {
-          status: 401,
+          status: 400,
         }
       );
     }
 
-    const body = await req.json();
+    const requestBody = body as {
+      amount?: unknown;
+      duration?: unknown;
+    };
 
-    const amount = Number(body.amount);
-    const duration = Number(body.duration);
+    const amount = Number(requestBody.amount);
+    const duration = Number(
+      requestBody.duration ?? 0
+    );
 
     if (
       !Number.isInteger(amount) ||
@@ -41,7 +78,8 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           success: false,
-          message: "Jumlah key harus antara 1 sampai 100",
+          message:
+            "Jumlah key harus antara 1 sampai 100",
         },
         {
           status: 400,
@@ -50,8 +88,9 @@ export async function POST(req: Request) {
     }
 
     if (
-      !Number.isFinite(duration) ||
-      duration < 0
+      !Number.isInteger(duration) ||
+      duration < 0 ||
+      duration > 36500
     ) {
       return NextResponse.json(
         {
@@ -68,15 +107,23 @@ export async function POST(req: Request) {
 
     if (duration > 0) {
       expiresAt = new Date();
+
       expiresAt.setDate(
         expiresAt.getDate() + duration
       );
     }
 
+    // Set mencegah duplikat di dalam batch yang sama.
+    const generatedKeys = new Set<string>();
+
+    while (generatedKeys.size < amount) {
+      generatedKeys.add(createLicenseKey());
+    }
+
     const keyData = Array.from(
-      { length: amount },
-      () => ({
-        key: createLicenseKey(),
+      generatedKeys,
+      (key) => ({
+        key,
         expiresAt,
       })
     );
@@ -86,19 +133,89 @@ export async function POST(req: Request) {
       skipDuplicates: true,
     });
 
-    return NextResponse.json({
-      success: true,
-      message: `${result.count} key berhasil dibuat`,
-      count: result.count,
-      keys: keyData.map((item) => item.key),
+    // Ambil kembali hanya key yang benar-benar ada di database.
+    const createdKeys = await prisma.key.findMany({
+      where: {
+        key: {
+          in: keyData.map((item) => item.key),
+        },
+      },
+      select: {
+        id: true,
+        key: true,
+        active: true,
+        expiresAt: true,
+        deviceId: true,
+        lastUsed: true,
+        useCount: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
+
+    await createActivity({
+      action: "Batch licenses generated",
+      detail: `${createdKeys.length} license dibuat`,
+      tone: "success",
+    });
+
+    await sendDiscordSafely({
+      title: "📦 Batch Licenses Generated",
+      color: 0xef4444,
+      fields: [
+        {
+          name: "Jumlah",
+          value: String(createdKeys.length),
+          inline: true,
+        },
+        {
+          name: "Durasi",
+          value:
+            duration === 0
+              ? "Permanen"
+              : `${duration} Hari`,
+          inline: true,
+        },
+        {
+          name: "Expired",
+          value: expiresAt
+            ? expiresAt.toLocaleString("id-ID")
+            : "Permanen",
+          inline: true,
+        },
+      ],
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: `${createdKeys.length} key berhasil dibuat`,
+        count: createdKeys.length,
+        keys: createdKeys.map(
+          (item) => item.key
+        ),
+        data: createdKeys,
+        requested: amount,
+        skipped:
+          amount - result.count,
+      },
+      {
+        status: 201,
+      }
+    );
   } catch (error) {
-    console.error("Batch generate error:", error);
+    console.error(
+      "Batch generate error:",
+      error
+    );
 
     return NextResponse.json(
       {
         success: false,
-        message: "Terjadi kesalahan saat membuat key",
+        message:
+          "Terjadi kesalahan saat membuat key",
       },
       {
         status: 500,
